@@ -11,10 +11,10 @@ interface Review {
 }
 
 export const Route = createFileRoute('/$productId')({
-  component: productDisplay,
+  component: ProductDisplay,
 })
 
-function productDisplay() {
+function ProductDisplay() {
   const [currentImage, setCurrentImage] = useState(0)
   const { productId } = Route.useParams()
   const product = useQuery({
