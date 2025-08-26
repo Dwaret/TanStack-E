@@ -3,34 +3,54 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { z } from 'zod'
 
-const productSchema = z.object({
+interface ListOfProductsProps {
+  category?: string
+  sortOrder?: string
+  query?: string
+}
+
+interface Product {
+  id: number
+  title: string
+  price: number
+  thumbnail: string
+}
+
+interface ProductResponse {
+  products: Array<Product>
+  total: number
+  skip: number
+  limit: number
+}
+
+const productSearchSchema = z.object({
   category: z.string().optional().default('all'),
   sortOrder: z.string().optional().default('title-asc'),
-  query: z.string().optional(),
+  query: z.string().optional().default(''),
 })
 
 export const Route = createFileRoute('/products')({
   component: Products,
-  search: (search) => productSchema.parse(search),
+  validateSearch: (search) => productSearchSchema.parse(search),
 })
 
 function Products() {
   const { category, sortOrder, query } = Route.useSearch()
   const navigate = useNavigate()
 
-  const handleCategoryChange = (newCategory) => {
+  const handleCategoryChange = (newCategory: string) => {
     navigate({
       search: { category: newCategory, sortOrder: sortOrder, query: '' },
     })
   }
 
-  const handleSortChange = (newSortOrder) => {
+  const handleSortChange = (newSortOrder: string) => {
     navigate({
       search: { category: category, sortOrder: newSortOrder, query: query },
     })
   }
 
-  const handleQueryChange = (newQuery) => {
+  const handleQueryChange = (newQuery: string) => {
     navigate({
       search: { category: 'all', sortOrder: 'title-asc', query: newQuery },
     })
@@ -43,21 +63,31 @@ function Products() {
         onCategoryChange={handleCategoryChange}
       />
       <SortSelector sortOrder={sortOrder} onSortChange={handleSortChange} />
-      <SearchBox query={query} onQueryChange={handleQueryChange} />
+      <SearchBox onQueryChange={handleQueryChange} />
       <ListOfProducts category={category} sortOrder={sortOrder} query={query} />
     </>
   )
 }
 
-function ListOfProducts({ category, sortOrder, query }) {
-  const listOfProducts = useInfiniteQuery({
+function ListOfProducts({
+  category = 'all',
+  sortOrder = 'title-asc',
+  query = '',
+}: ListOfProductsProps) {
+  const listOfProducts = useInfiniteQuery<ProductResponse>({
     queryKey: ['products', category, sortOrder, query],
-    queryFn: ({ pageParam = 1 }) =>
-      getProducts({ page: pageParam }, category, sortOrder, query),
+    queryFn: ({ pageParam = 1 }) => {
+      return getProducts(
+        { page: pageParam } as { page: number },
+        category,
+        sortOrder,
+        query,
+      )
+    },
+    initialPageParam: 1,
     getNextPageParam: (lastPage, allPages) => {
-      return lastPage.total >= allPages.length * 20
-        ? allPages.length + 1
-        : undefined
+      const fetchedItems = lastPage.skip + lastPage.products.length
+      return fetchedItems < lastPage.total ? allPages.length + 1 : undefined
     },
   })
   return (
@@ -89,7 +119,13 @@ function ListOfProducts({ category, sortOrder, query }) {
   )
 }
 
-function CategorySelector({ category, onCategoryChange }) {
+function CategorySelector({
+  category,
+  onCategoryChange,
+}: {
+  category: string
+  onCategoryChange: (newCategory: string) => void
+}) {
   const listOfCategories = useQuery({
     queryKey: ['category'],
     queryFn: getCategories,
@@ -99,7 +135,7 @@ function CategorySelector({ category, onCategoryChange }) {
     return (
       <>
         <select>
-          <option key="loading">Loading...</option>;
+          <option key="loading">Loading...</option>
         </select>
       </>
     )
@@ -111,10 +147,10 @@ function CategorySelector({ category, onCategoryChange }) {
         value={category}
         onChange={(e) => onCategoryChange(e.target.value)}
       >
-        <option key="all" value="">
+        <option key="all" value="all">
           All
         </option>
-        {listOfCategories.data.map((e) => {
+        {listOfCategories.data.map((e: { name: string; slug: string }) => {
           return (
             <option key={e.slug} value={e.slug}>
               {e.name}
@@ -126,7 +162,13 @@ function CategorySelector({ category, onCategoryChange }) {
   )
 }
 
-function SortSelector({ sortOrder, onSortChange }) {
+function SortSelector({
+  sortOrder,
+  onSortChange,
+}: {
+  sortOrder: string
+  onSortChange: (newSortOrder: string) => void
+}) {
   return (
     <>
       <select value={sortOrder} onChange={(e) => onSortChange(e.target.value)}>
@@ -139,7 +181,11 @@ function SortSelector({ sortOrder, onSortChange }) {
   )
 }
 
-function SearchBox({ query, onQueryChange }) {
+function SearchBox({
+  onQueryChange,
+}: {
+  onQueryChange: (newQuery: string) => void
+}) {
   const [queryInput, setQueryInput] = useState('')
 
   return (
@@ -175,26 +221,32 @@ async function getCategories() {
 }
 
 async function getProducts(
-  { page },
-  category = '',
+  { page }: { page: number },
+  category = 'all',
   sort = 'title-asc',
   query = '',
 ) {
   const skip = page * 20 - 20
-  let response
 
-  category = category ? `/category/${category}` : ''
+  const sortSplit = sort.split('-')
+  const params = new URLSearchParams({
+    limit: '20',
+    skip: skip.toString(),
+    select: 'id,title,price,thumbnail',
+    sortBy: sortSplit[0],
+    order: sortSplit[1],
+  })
 
-  sort = sort.split('-')
+  let endpoint = 'https://dummyjson.com/products'
   if (query) {
-    response = await fetch(
-      `https://dummyjson.com/products${`/search?q=${encodeURIComponent(query)}`}&limit=20&skip=${skip}&select=title,price,thumbnail&sortBy=${sort[0]}&order=${sort[1]}`,
-    )
-  } else {
-    response = await fetch(
-      `https://dummyjson.com/products${category}?limit=20&skip=${skip}&select=title,price,thumbnail&sortBy=${sort[0]}&order=${sort[1]}`,
-    )
+    endpoint += `/search`
+    params.set('q', query)
+  } else if (category !== 'all') {
+    endpoint += `/category/${category}`
   }
+
+  const response = await fetch(`${endpoint}?${params.toString()}`)
+
   if (!response.ok) {
     throw new Error('Error fetching products')
   }
