@@ -1,13 +1,7 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { z } from 'zod'
-
-interface ListOfProductsProps {
-  category?: string
-  sortOrder?: string
-  query?: string
-}
 
 interface Product {
   id: number
@@ -30,8 +24,8 @@ const productSearchSchema = z.object({
 })
 
 export const Route = createFileRoute('/products')({
+  validateSearch: productSearchSchema,
   component: Products,
-  validateSearch: (search) => productSearchSchema.parse(search),
 })
 
 function Products() {
@@ -57,15 +51,17 @@ function Products() {
   }
 
   return (
-    <>
-      <CategorySelector
-        category={category}
-        onCategoryChange={handleCategoryChange}
-      />
-      <SortSelector sortOrder={sortOrder} onSortChange={handleSortChange} />
-      <SearchBox onQueryChange={handleQueryChange} />
+    <div className="container mx-auto p-6">
+      <div className="flex flex-col md:flex-row gap-4 mb-8 items-center justify-between">
+        <CategorySelector
+          category={category}
+          onCategoryChange={handleCategoryChange}
+        />
+        <SortSelector sortOrder={sortOrder} onSortChange={handleSortChange} />
+        <SearchBox onQueryChange={handleQueryChange} />
+      </div>
       <ListOfProducts category={category} sortOrder={sortOrder} query={query} />
-    </>
+    </div>
   )
 }
 
@@ -73,7 +69,7 @@ function ListOfProducts({
   category = 'all',
   sortOrder = 'title-asc',
   query = '',
-}: ListOfProductsProps) {
+}) {
   const listOfProducts = useInfiniteQuery<ProductResponse>({
     queryKey: ['products', category, sortOrder, query],
     queryFn: ({ pageParam = 1 }) => {
@@ -91,31 +87,42 @@ function ListOfProducts({
     },
   })
   return (
-    <>
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
       {listOfProducts.data?.pages.map((page, i) => (
-        <div key={i}>
+        <div key={i} className="contents">
           {page.products.map((product) => (
-            <div
+            <Link
+              to="/$productId"
+              params={{ productId: String(product.id) }}
               key={product.id}
-              className="border border-gray-300 m-2.5 p-2.5 inline-block"
             >
-              <h3>{product.title}</h3>
-              <p>${product.price}</p>
-              <img src={product.thumbnail} alt={product.title} />
-            </div>
+              <div className="border border-gray-200 rounded-lg shadow-sm p-4 hover:shadow-lg transition-shadow duration-300 transform hover:-translate-y-1">
+                <img
+                  src={product.thumbnail}
+                  alt={product.title}
+                  className="w-full h-48 object-cover rounded-md mb-4"
+                />
+                <h3 className="text-lg font-semibold text-gray-800 truncate">
+                  {product.title}
+                </h3>
+                <p className="text-xl font-bold text-indigo-600 mt-2">
+                  ${product.price}
+                </p>
+              </div>
+            </Link>
           ))}
         </div>
       ))}
       {listOfProducts.hasNextPage ? (
         <button
           onClick={() => listOfProducts.fetchNextPage()}
-          className="bg-indigo-600 text-white font-semibold py-2 px-6 rounded-full shadow-md transition-all duration-300 hover:bg-indigo-700 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 m-auto block"
+          className="bg-indigo-600 text-white font-semibold py-2 px-6 rounded-full shadow-md transition-all duration-300 hover:bg-indigo-700 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 col-span-full mx-auto my-8"
           disabled={listOfProducts.isFetchingNextPage}
         >
           {listOfProducts.isFetchingNextPage ? 'Loading more...' : 'Load More'}
         </button>
       ) : null}
-    </>
+    </div>
   )
 }
 
@@ -133,32 +140,27 @@ function CategorySelector({
   })
   if (listOfCategories.isPending) {
     return (
-      <>
-        <select>
-          <option key="loading">Loading...</option>
-        </select>
-      </>
+      <select className="border border-gray-300 rounded-md px-4 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <option>Loading...</option>
+      </select>
     )
   }
 
   return (
-    <>
-      <select
-        value={category}
-        onChange={(e) => onCategoryChange(e.target.value)}
-      >
-        <option key="all" value="all">
-          All
-        </option>
-        {listOfCategories.data.map((e: { name: string; slug: string }) => {
-          return (
-            <option key={e.slug} value={e.slug}>
-              {e.name}
-            </option>
-          )
-        })}
-      </select>
-    </>
+    <select
+      value={category}
+      onChange={(e) => onCategoryChange(e.target.value)}
+      className="border border-gray-300 rounded-md px-4 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+    >
+      <option value="all">All Categories</option>
+      {listOfCategories.data.map((e: { name: string; slug: string }) => {
+        return (
+          <option key={e.slug} value={e.slug}>
+            {e.name}
+          </option>
+        )
+      })}
+    </select>
   )
 }
 
@@ -170,14 +172,16 @@ function SortSelector({
   onSortChange: (newSortOrder: string) => void
 }) {
   return (
-    <>
-      <select value={sortOrder} onChange={(e) => onSortChange(e.target.value)}>
-        <option value="title-asc">Name: A to Z</option>
-        <option value="title-desc">Name: Z to A</option>
-        <option value="price-asc">Price: Low to High</option>
-        <option value="price-desc">Price: High to Low</option>
-      </select>
-    </>
+    <select
+      value={sortOrder}
+      onChange={(e) => onSortChange(e.target.value)}
+      className="border border-gray-300 rounded-md px-4 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+    >
+      <option value="title-asc">Name: A to Z</option>
+      <option value="title-desc">Name: Z to A</option>
+      <option value="price-asc">Price: Low to High</option>
+      <option value="price-desc">Price: High to Low</option>
+    </select>
   )
 }
 
@@ -189,26 +193,26 @@ function SearchBox({
   const [queryInput, setQueryInput] = useState('')
 
   return (
-    <>
-      <form>
-        <input
-          type="text"
-          value={queryInput}
-          onChange={(e) => setQueryInput(e.target.value)}
-          placeholder="Search products..."
-        />
-        <button
-          type="submit"
-          onClick={(e) => {
-            e.preventDefault()
-            setQueryInput('')
-            onQueryChange(queryInput)
-          }}
-        >
-          Search
-        </button>
-      </form>
-    </>
+    <form className="flex">
+      <input
+        type="text"
+        value={queryInput}
+        onChange={(e) => setQueryInput(e.target.value)}
+        placeholder="Search products..."
+        className="flex-grow border border-gray-300 rounded-l-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      />
+      <button
+        type="submit"
+        onClick={(e) => {
+          e.preventDefault()
+          onQueryChange(queryInput)
+          setQueryInput('')
+        }}
+        className="bg-indigo-600 text-white font-semibold py-2 px-4 rounded-r-md transition-colors duration-200 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      >
+        Search
+      </button>
+    </form>
   )
 }
 
