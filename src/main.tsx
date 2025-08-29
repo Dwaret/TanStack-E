@@ -6,16 +6,22 @@ import * as TanStackQueryProvider from './integrations/tanstack-query/root-provi
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen'
-
+import { AuthProvider, useAuth } from './auth'
 import './styles.css'
 import reportWebVitals from './reportWebVitals.ts'
 
 // Create a new router instance
 
+function InnerApp() {
+  const auth = useAuth()
+  return <RouterProvider router={router} context={{ auth }} />
+}
+
 const TanStackQueryProviderContext = TanStackQueryProvider.getContext()
 const router = createRouter({
   routeTree,
   context: {
+    auth: undefined!,
     ...TanStackQueryProviderContext,
   },
   defaultPreload: 'intent',
@@ -38,7 +44,9 @@ if (rootElement && !rootElement.innerHTML) {
   root.render(
     <StrictMode>
       <TanStackQueryProvider.Provider {...TanStackQueryProviderContext}>
-        <RouterProvider router={router} />
+        <AuthProvider>
+          <InnerApp />
+        </AuthProvider>
       </TanStackQueryProvider.Provider>
     </StrictMode>,
   )

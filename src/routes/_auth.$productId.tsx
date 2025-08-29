@@ -10,7 +10,7 @@ interface Review {
   reviewerEmail: string
 }
 
-export const Route = createFileRoute('/$productId')({
+export const Route = createFileRoute('/_auth/$productId')({
   component: ProductDisplay,
 })
 

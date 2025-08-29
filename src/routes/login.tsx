@@ -1,6 +1,8 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
+
+import { useAuth } from '../auth'
 
 interface getLoginInfoProp {
   name: string
@@ -12,17 +14,27 @@ export const Route = createFileRoute('/login')({
 })
 
 function Login() {
+  const auth = useAuth()
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const navigate = useNavigate()
 
   const loginInfo = useMutation({
     mutationFn: () => getLoginInfo({ name, password }),
-    onSuccess: () => navigate({ to: '/' }),
+    onSuccess: async (data) => {
+      await auth.login({
+        id: data.id,
+        email: data.email,
+        username: data.username,
+        image: data.image,
+      })
+      navigate({ to: '/' })
+    },
   })
 
   function handleLogin(e: React.FormEvent) {
     e.preventDefault()
+    console.log(name, password)
     loginInfo.mutate()
   }
 
@@ -52,16 +64,13 @@ function Login() {
           placeholder="Password"
           className="rounded border border-gray-300 p-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-        {loginInfo.isPending ? (
-          <div>Loading...</div>
-        ) : (
-          <button
-            type="submit"
-            className="rounded bg-blue-500 p-2 font-bold text-white transition-colors hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            Login
-          </button>
-        )}
+        <button
+          type="submit"
+          className="rounded bg-blue-500 p-2 font-bold text-white transition-colors hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          disabled={loginInfo.isPending}
+        >
+          {loginInfo.isPending ? 'Loading...' : 'Login'}
+        </button>
       </form>
     </div>
   )
@@ -78,7 +87,6 @@ async function getLoginInfo({ name, password }: getLoginInfoProp) {
     credentials: 'omit',
   })
   if (!response.ok) {
-    setIsWrong(true)
     throw new Error('Error fetching login info')
   }
   return response.json()

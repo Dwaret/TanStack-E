@@ -7,8 +7,10 @@ import Header from '../components/Header'
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
 import type { QueryClient } from '@tanstack/react-query'
+import type { AuthContext } from '../auth'
 
 interface MyRouterContext {
+  auth: AuthContext
   queryClient: QueryClient
 }
 
