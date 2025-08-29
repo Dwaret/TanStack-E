@@ -8,7 +8,7 @@ export const Route = createFileRoute('/_auth/user')({
 function RouteComponent() {
   const auth = useAuth()
   const router = useRouter()
-  const { email, username, image } = auth.user
+  const { email, username, image } = auth.user || {}
 
   const handleLogout = () => {
     auth.logout()
